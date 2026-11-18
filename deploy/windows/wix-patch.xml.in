@@ -21,8 +21,7 @@
   </CPackWiXFragment>
 
   <CPackWiXFragment Id="CM_CP_deskflow_core.exe">
-    <firewall:FirewallException Id="ServerFirewallException" Name="Deskflow Server" Program="[INSTALL_ROOT]deskflow-core.exe" Scope="any"/>
-    <firewall:FirewallException Id="ClientFirewallException" Name="Deskflow Client" Program="[INSTALL_ROOT]deskflow-core.exe" Scope="any"/>
+    <firewall:FirewallException Id="ServerFirewallException" Name="Deskflow Server" Program="[INSTALL_ROOT]deskflow-core.exe" Protocol="tcp" Scope="any"/>
   </CPackWiXFragment>
 
   <CPackWiXFragment Id="#PRODUCT">
@@ -96,6 +95,25 @@
       Impersonate="yes"
       Return="asyncNoWait" />
 
+    <!--
+      Older installers also created a "Deskflow Client" firewall rule for
+      deskflow-core.exe, identical to "Deskflow Server". An upgrade keeps the
+      deskflow-core.exe component, so the old package never removes that rule
+      and it would outlive even an uninstall. Delete it when upgrading.
+    -->
+    <SetProperty
+      Id="RemoveLegacyClientFirewallRule"
+      Value="&quot;[System64Folder]netsh.exe&quot; advfirewall firewall delete rule name=&quot;Deskflow Client&quot; program=&quot;[INSTALL_ROOT]deskflow-core.exe&quot;"
+      Before="RemoveLegacyClientFirewallRule"
+      Sequence="execute" />
+    <CustomAction
+      Id="RemoveLegacyClientFirewallRule"
+      BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+      DllEntry="WixQuietExec"
+      Execute="deferred"
+      Impersonate="no"
+      Return="ignore" />
+
     <InstallExecuteSequence>
       <Custom
         Action="CheckVCRedist"
@@ -105,6 +123,10 @@
         Action="ShowVCRedistError"
         Before="InstallInitialize"
         Condition="NOT Installed AND (NOT VC_REDIST_INSTALLED OR NOT VC_REDIST_VERSION_OK)" />
+      <Custom
+        Action="RemoveLegacyClientFirewallRule"
+        After="InstallFiles"
+        Condition="WIX_UPGRADE_DETECTED" />
     </InstallExecuteSequence>
   </CPackWiXFragment>
 </CPackWiXPatch>
